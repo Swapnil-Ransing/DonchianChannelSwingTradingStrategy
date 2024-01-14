@@ -14,7 +14,44 @@ st.subheader("List of stock that this strategy evaluates consists of :")
 
 # Displaying the list of tickers
 # ticker_lst=['HDFCBANK','ICICIBANK','FINEORG']
-ticker_lst=['HDFCBANK','ICICIBANK','FINEORG']
+# ticker_lst=['HDFCBANK','ICICIBANK','FINEORG']
+ticker_lst=['HDFCBANK',
+            'BAJFINANCE',
+            'RELIANCE',
+            'ASIANPAINT',
+            'BALKRISIND',
+            'NAUKRI',
+            'TATAPOWER',
+            'POLYCAB',
+            'STARHEALTH',
+            'LALPATHLAB',
+            'IDFCFIRSTB',
+            'DMART',
+            'TITAN',
+            'PIIND',
+            'ICICIBANK',
+            'FINEORG',
+            'BHARTIARTL',
+            'MUTHOOTFIN',
+            'TORNTPOWER',
+            'AMBUJACEM',
+            'DEEPAKNTR',
+            'DIVISLAB',
+            'GSPL',
+            'POWERGRID',
+            'NAVINFLUOR',
+            # 'SENCO',
+            'SONACOMS',
+            'INDIAMART',
+            # 'AVALON',
+            'MANYAVAR',
+            'BLUEDART',
+            'MAPMYINDIA',
+            'CAMPUS',
+            'SYNGENE',
+            'CARBORUNIV',
+            'SOLARINDS',
+            'RBA']
 for i in ticker_lst:
     st.markdown("- " + i)
 
