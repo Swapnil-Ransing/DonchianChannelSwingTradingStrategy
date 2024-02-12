@@ -154,6 +154,7 @@ def donchian_reverse_macd(aapl, investment,macd_signal_diff,stop_loss_pct,print_
               buy_date = str(aapl.index[i])[:10]
               equity -= (no_of_shares * aapl.Close[i])
               in_position = True
+              buy_signal = False
               if print_results == 'Yes':
                 print(cl('Buy: ', color = 'green', attrs = ['bold']), f'{no_of_shares} Shares are bought at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on price')
         # Buy when buy_signal is True now however buy did not happened becaseue of MACDh_12_26_9 < 0 in previous situation
@@ -219,8 +220,109 @@ def donchian_reverse_macd(aapl, investment,macd_signal_diff,stop_loss_pct,print_
     current_price=round(aapl.Close[i],2)
     return [round(equity,1),roi,CAGR,round(Successful_trades/Total_trades*100,2),buy_date,round(buy_price,2),current_price,buy_signal_alert]
 
+# Donchian reverse with selected swing
+
+def donchian_reverse_macd_selectedSwing(aapl, investment, macd_signal_diff, stop_loss_pct, trailing_stop_loss_gain_pct,
+                                        trailing_stop_loss_pct, print_results):
+    in_position = False
+    equity = investment
+    buy_signal = False
+    trailing_stop_loss_flag = False
+    buy_price = 0
+    Total_trades = 0
+    Successful_trades = 0
+    buy_signal_alert = 'Open'
+
+    for i in range(50, len(aapl)):
+        # Buy if low price is at dcl and MACDh_12_26_9 > 0
+        if aapl['Low'][i] == aapl['dcl'][i] and in_position == False:
+            buy_signal = True
+            if aapl['MACDh_12_26_9'][i] > macd_signal_diff:
+                no_of_shares = math.floor(equity / aapl.Close[i])
+                buy_price = aapl.Close[i]
+                buy_date = str(aapl.index[i])[:10]
+                equity -= (no_of_shares * aapl.Close[i])
+                in_position = True
+                buy_signal = False
+                high_price = buy_price
+                trailing_stop_loss_price = (1 + (trailing_stop_loss_gain_pct / 100)) * buy_price
+                if print_results == 'Yes':
+                    print(cl('Buy: ', color='green', attrs=['bold']),
+                          f'{no_of_shares} Shares are bought at {round(aapl.Close[i], 2)} on {str(aapl.index[i])[:10]} based on price')
+        # Buy when buy_signal is True now however buy did not happened becaseue of MACDh_12_26_9 < 0 in previous situation
+        elif buy_signal == True and in_position == False and aapl['Low'][i] >= aapl['dcl'][i] and aapl['MACDh_12_26_9'][
+            i] > macd_signal_diff:
+            # elif buy_signal == True and in_position == False and aapl['MACDh_12_26_9'][i] > macd_signal_diff:
+            no_of_shares = math.floor(equity / aapl.Close[i])
+            buy_price = aapl.Close[i]
+            high_price = buy_price
+            trailing_stop_loss_price = (1 + (trailing_stop_loss_gain_pct / 100)) * buy_price
+            buy_date = str(aapl.index[i])[:10]
+            equity -= (no_of_shares * aapl.Close[i])
+            in_position = True
+            buy_signal = False
+            if print_results == 'Yes':
+                print(cl('Buy: ', color='green', attrs=['bold']),
+                      f'{no_of_shares} Shares are bought at {round(aapl.Close[i], 2)} on {str(aapl.index[i])[:10]} based on price and buy signal')
+        # Sell when stoploss is reached
+        elif aapl['Close'][i] < (buy_price * (1 - (stop_loss_pct / 100))) and in_position == True:
+            equity += (no_of_shares * aapl.Close[i])
+            in_position = False
+            trailing_stop_loss_flag = False
+            Total_trades += 1
+            if buy_price < aapl.Close[i]:
+                Successful_trades += 1
+            if print_results == 'Yes':
+                print(cl('Sell: ', color='red', attrs=['bold']),
+                      f'{no_of_shares} Shares are sold at {round(aapl.Close[i], 2)} on {str(aapl.index[i])[:10]} based on Stop Loss')
+        # Sell when gain is > 20% then based on trailing stop loss
+        # Determine the high price achieved and then set the trailing stop loss activation flag = 1
+        elif in_position == True:
+            if aapl.Close[i] > trailing_stop_loss_price:
+                trailing_stop_loss_flag = True
+                if aapl.Close[i] >= high_price:
+                    high_price = aapl.Close[i]
+            if aapl['Close'][i] < (
+                    high_price * (1 - (trailing_stop_loss_pct / 100))) and trailing_stop_loss_flag == True:
+                equity += (no_of_shares * aapl.Close[i])
+                in_position = False
+                trailing_stop_loss_flag = False
+                Total_trades += 1
+                if buy_price < aapl.Close[i]:
+                    Successful_trades += 1
+                if print_results == 'Yes':
+                    print(cl('Sell: ', color='red', attrs=['bold']),
+                          f'{no_of_shares} Shares are sold at {round(aapl.Close[i], 2)} on {str(aapl.index[i])[:10]} based on Trailing Stop Loss')
+
+    if in_position == True:
+        equity += (no_of_shares * aapl.Close[i])
+        Total_trades += 1
+        if buy_price < aapl.Close[i]:
+            Successful_trades += 1
+        if print_results == 'Yes':
+            print(cl(f'\nClosing position at {round(aapl.Close[i], 2)} on {str(aapl.index[i])[:10]}', attrs=['bold']))
+        in_position = False
+
+    elif in_position == False:
+        # This means position is closed and no buy signal is present. Correct the buy signal attibute to complete
+        buy_signal_alert = 'Close'
+
+    earning = round(equity - investment, 2)
+    roi = round(earning / investment * 100, 2)
+    # CAGR Calculation
+    total_years = aapl.index[-1].year - aapl.index[0].year
+    CAGR = round(((equity / investment) ** (1 / total_years) - 1) * 100, 2)
+    if print_results == 'Yes':
+        print(
+            cl(f'EARNING: {earning} ;Investment Price: {round(equity, 1)}; CAGR: {CAGR} ; ROI: {roi}%', attrs=['bold']))
+        print(cl(f'Total Trades: {Total_trades}; Success Ratio : {round(Successful_trades / Total_trades * 100, 2)}'))
+    current_price = round(aapl.Close[i], 2)
+    return [round(equity, 1), roi, CAGR, round(Successful_trades / Total_trades * 100, 2), buy_date,
+            round(buy_price, 2), current_price, buy_signal_alert]
+
 # Automating all 3 strategies for a single ticker
-def automate_strategies(ticker,start,investment,print_results,macd_diff,stop_loss,Daily):
+def automate_strategies(ticker,start,investment,print_results,macd_diff,stop_loss,
+                        trailing_stop_loss_gain_pct,trailing_stop_loss_pct,Daily):
   """
   This function runs all the three developed Donchian strategies and outputs the dataframe with results of these strategies.
   Input:
@@ -230,6 +332,8 @@ def automate_strategies(ticker,start,investment,print_results,macd_diff,stop_los
   print_results : Yes/No value for printing the intermediate buy sell results
   macd_diff : for 3rd strategy buy or sell will happen based on this difference
   stop_loss : for 3rd strategy, stop loss for sell signal
+  trailing_stop_loss_gain_pct : gain required before activating the trailing stop loss
+  trailing_stop_loss_pct : loss from high price for trailing stop loss
   Daily : Yes/No for daily or weekly price actions
 
   """
@@ -277,10 +381,20 @@ def automate_strategies(ticker,start,investment,print_results,macd_diff,stop_los
   #Append the results to the dataframe
   result_df.loc[len(result_df)] = results_lst
 
+  # Strategy 4 - Reverse with MACD selected swing
+  results_lst = [ticker, 'RevMACD_SelSw', investment, df.index[-1].year - df.index[0].year]
+  res = donchian_reverse_macd_selectedSwing(df, investment, macd_diff, stop_loss,
+                                            trailing_stop_loss_gain_pct,
+                                            trailing_stop_loss_pct, print_results)
+  results_lst.extend(res)
+  # Append the results to the dataframe
+  result_df.loc[len(result_df)] = results_lst
+
   return result_df
 
 # Automating the strategies for multiple stocks
-def automate_multiplestocks(ticker_lst,start,investment,print_results,macd_diff,stop_loss,Daily):
+def automate_multiplestocks(ticker_lst,start,investment,print_results,macd_diff,stop_loss,
+                            trailing_stop_loss_gain_pct,trailing_stop_loss_pct,Daily):
 
   """
   This function runs all the three developed Donchian strategies for multiple stocks and outputs the dataframe with results of these strategies.
@@ -299,14 +413,16 @@ def automate_multiplestocks(ticker_lst,start,investment,print_results,macd_diff,
   result_df=pd.DataFrame(columns=['Stock','Strategy','Investment','Total_Years','Final_Price','ROI','CAGR','Success_Ratio','Buy_Date','Buy_Price','CMP','Buy_Signal'])
 
   for ele in ticker_lst:
-    res_df = automate_strategies(ele,start,investment,print_results,macd_diff,stop_loss,Daily)
+    res_df = automate_strategies(ele,start,investment,print_results,macd_diff,stop_loss,
+                                 trailing_stop_loss_gain_pct,trailing_stop_loss_pct,Daily)
     # concat the single stock results dataframe to the main dataframe
     result_df = pd.concat([result_df, res_df], ignore_index=True)
 
   return result_df
 
 # Buy alert generation
-def buy_alert(ticker_lst,start,investment,print_results,macd_diff,stop_loss,Daily):
+def buy_alert(ticker_lst,start,investment,print_results,macd_diff,stop_loss,
+              trailing_stop_loss_gain_pct,trailing_stop_loss_pct,Daily):
 
   """
   This function runs all the three developed Donchian strategies for multiple stocks.
@@ -328,7 +444,8 @@ def buy_alert(ticker_lst,start,investment,print_results,macd_diff,stop_loss,Dail
   result_df=pd.DataFrame(columns=['Stock','Strategy','Investment','Total_Years','Final_Price','ROI','CAGR','Success_Ratio','Buy_Date','Buy_Price','CMP','Buy_Signal'])
 
   for ele in ticker_lst:
-    res_df = automate_strategies(ele,start,investment,print_results,macd_diff,stop_loss,Daily)
+    res_df = automate_strategies(ele,start,investment,print_results,macd_diff,stop_loss,
+                                 trailing_stop_loss_gain_pct,trailing_stop_loss_pct,Daily)
     # # Keep only the best strategy of a ticker
     # filt = (res_df['CAGR'] == res_df.CAGR.max())
     # res_df_subset = res_df[filt]
@@ -463,6 +580,7 @@ def donchian_reverse_macd_st(aapl, investment,macd_signal_diff,stop_loss_pct,pri
               buy_date = str(aapl.index[i])[:10]
               equity -= (no_of_shares * aapl.Close[i])
               in_position = True
+              buy_signal = False
               if print_results == 'Yes':
                   st.write(f'Buy: {no_of_shares} Shares are bought at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on price')
         # Buy when buy_signal is True now however buy did not happened becaseue of MACDh_12_26_9 < 0 in previous situation
@@ -525,3 +643,93 @@ def donchian_reverse_macd_st(aapl, investment,macd_signal_diff,stop_loss_pct,pri
     if print_results == 'Yes':
       st.write(f'EARNING: **{earning}** ;Investment Price: **{round(equity,1)}**; CAGR: **{CAGR}** ; ROI: **{roi}**%')
       st.write(f'Total Trades: **{Total_trades}**; Success Ratio : **{round(Successful_trades/Total_trades*100,2)}**')
+
+def donchian_reverse_macd_selectedSwing_st(aapl, investment, macd_signal_diff, stop_loss_pct, trailing_stop_loss_gain_pct,
+                                        trailing_stop_loss_pct, print_results):
+    in_position = False
+    equity = investment
+    buy_signal = False
+    trailing_stop_loss_flag = False
+    buy_price = 0
+    Total_trades = 0
+    Successful_trades = 0
+    buy_signal_alert = 'Open'
+
+    for i in range(50, len(aapl)):
+        # Buy if low price is at dcl and MACDh_12_26_9 > 0
+        if aapl['Low'][i] == aapl['dcl'][i] and in_position == False:
+            buy_signal = True
+            if aapl['MACDh_12_26_9'][i] > macd_signal_diff:
+                no_of_shares = math.floor(equity / aapl.Close[i])
+                buy_price = aapl.Close[i]
+                buy_date = str(aapl.index[i])[:10]
+                equity -= (no_of_shares * aapl.Close[i])
+                in_position = True
+                buy_signal = False
+                high_price = buy_price
+                trailing_stop_loss_price = (1 + (trailing_stop_loss_gain_pct / 100)) * buy_price
+                if print_results == 'Yes':
+                    st.write(f'Buy: {no_of_shares} Shares are bought at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on price')
+        # Buy when buy_signal is True now however buy did not happened becaseue of MACDh_12_26_9 < 0 in previous situation
+        elif buy_signal == True and in_position == False and aapl['Low'][i] >= aapl['dcl'][i] and aapl['MACDh_12_26_9'][
+            i] > macd_signal_diff:
+            # elif buy_signal == True and in_position == False and aapl['MACDh_12_26_9'][i] > macd_signal_diff:
+            no_of_shares = math.floor(equity / aapl.Close[i])
+            buy_price = aapl.Close[i]
+            high_price = buy_price
+            trailing_stop_loss_price = (1 + (trailing_stop_loss_gain_pct / 100)) * buy_price
+            buy_date = str(aapl.index[i])[:10]
+            equity -= (no_of_shares * aapl.Close[i])
+            in_position = True
+            buy_signal = False
+            if print_results == 'Yes':
+                st.write(f'Buy: {no_of_shares} Shares are bought at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on price and buy signal')
+        # Sell when stoploss is reached
+        elif aapl['Close'][i] < (buy_price * (1 - (stop_loss_pct / 100))) and in_position == True:
+            equity += (no_of_shares * aapl.Close[i])
+            in_position = False
+            trailing_stop_loss_flag = False
+            Total_trades += 1
+            if buy_price < aapl.Close[i]:
+                Successful_trades += 1
+            if print_results == 'Yes':
+                st.write(f'Sell: {no_of_shares} Shares are sold at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on Stop Loss')
+        # Sell when gain is > 20% then based on trailing stop loss
+        # Determine the high price achieved and then set the trailing stop loss activation flag = 1
+        elif in_position == True:
+            if aapl.Close[i] > trailing_stop_loss_price:
+                trailing_stop_loss_flag = True
+                if aapl.Close[i] >= high_price:
+                    high_price = aapl.Close[i]
+            if aapl['Close'][i] < (
+                    high_price * (1 - (trailing_stop_loss_pct / 100))) and trailing_stop_loss_flag == True:
+                equity += (no_of_shares * aapl.Close[i])
+                in_position = False
+                trailing_stop_loss_flag = False
+                Total_trades += 1
+                if buy_price < aapl.Close[i]:
+                    Successful_trades += 1
+                if print_results == 'Yes':
+                    st.write(f'Sell: {no_of_shares} Shares are sold at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]} based on Trailing Stop Loss')
+
+    if in_position == True:
+        equity += (no_of_shares * aapl.Close[i])
+        Total_trades += 1
+        if buy_price < aapl.Close[i]:
+            Successful_trades += 1
+        if print_results == 'Yes':
+            st.write(f'Closing position at {round(aapl.Close[i],2)} on {str(aapl.index[i])[:10]}')
+        in_position = False
+
+    elif in_position == False:
+        # This means position is closed and no buy signal is present. Correct the buy signal attibute to complete
+        buy_signal_alert = 'Close'
+
+    earning = round(equity - investment, 2)
+    roi = round(earning / investment * 100, 2)
+    # CAGR Calculation
+    total_years = aapl.index[-1].year - aapl.index[0].year
+    CAGR = round(((equity / investment) ** (1 / total_years) - 1) * 100, 2)
+    if print_results == 'Yes':
+        st.write(f'EARNING: **{earning}** ;Investment Price: **{round(equity,1)}**; CAGR: **{CAGR}** ; ROI: **{roi}**%')
+        st.write(f'Total Trades: **{Total_trades}**; Success Ratio : **{round(Successful_trades/Total_trades*100,2)}**')
