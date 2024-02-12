@@ -104,7 +104,7 @@ st.text("Buy_Date (yyyy-mm-dd): Buy signal date (Results will be greater than se
 Buy_Signal = st.radio("Buy Signal: ",["Open","Close"])
 CMP_Bp_diff_pct = st.number_input('CMP_Bp_diff_pct', min_value=-100, max_value=100, value=5, step=1)
 CAGR = st.number_input('CAGR', min_value=-100, max_value=100, value=5, step=1)
-Buy_Date = st.text_input("Buy_Date: ",'2023-12-20')
+Buy_Date = st.text_input("Buy_Date: ",'2024-02-05')
 
 if st.button("Submit", key='my_button_1'):
     # Generate results for large number of stocks
@@ -141,10 +141,10 @@ st.text("Stop Loss (int)")
 
 Ticker_Name=st.text_input("Ticker Name :",'ICICIBANK')
 Backtest_start_Date=st.text_input("Backtest start date :",'2000-01-01')
-investment=st.number_input('Initial investment amount :',100000)
+investment=st.number_input('Initial investment amount :', min_value=0, max_value=100000000, value=100000, step=1)
 # print_results = st.radio("Print Results : ",["No","Yes"])
-macd_dif=st.number_input("MACD Difference :",-5)
-stop_loss=st.number_input("Stop Loss :",8)
+macd_dif=st.number_input("MACD Difference :", min_value=-200, max_value=2100, value=5, step=1)
+stop_loss=st.number_input("Stop Loss :", min_value=-100, max_value=100, value=8, step=1)
 
 if st.button("Refine", key='my_button_2'):
     # Refined stock on daily basis results
