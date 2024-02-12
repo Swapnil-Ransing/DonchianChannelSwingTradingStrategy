@@ -95,16 +95,18 @@ for i in ticker_lst:
     st.markdown("- " + i)
 
 st.subheader("Please provide the following inputs to filter the stocks:")
+st.text("Strategy: Select the strategy amongst four")
 st.text("Buy Signal: Whether the trade is Open or Close")
 st.text("CMP_Bp_diff_pct (int) : PCT Difference between CMP and signal Buy price (Results will be less than selected)")
 st.text("CAGR (int): Min. CAGR that strategy should have generated")
 st.text("Buy_Date (yyyy-mm-dd): Buy signal date (Results will be greater than selected)")
 
 # User Input Buttons
+Strategy_signal = st.radio("Strategy: ",["Plain","Reverse","RevMACD","RevMACD_SelSw"])
 Buy_Signal = st.radio("Buy Signal: ",["Open","Close"])
 CMP_Bp_diff_pct = st.number_input('CMP_Bp_diff_pct', min_value=-100, max_value=100, value=5, step=1)
 CAGR = st.number_input('CAGR', min_value=-100, max_value=100, value=5, step=1)
-Buy_Date = st.text_input("Buy_Date: ",'2024-02-05')
+Buy_Date = st.text_input("Buy_Date: ",'2024-02-01')
 
 if st.button("Submit", key='my_button_1'):
     # Generate results for large number of stocks
@@ -114,13 +116,16 @@ if st.button("Submit", key='my_button_1'):
                                        print_results='No',
                                        macd_diff=-5,
                                        stop_loss=8,
+                                       trailing_stop_loss_gain_pct=30,
+                                       trailing_stop_loss_pct=10,
                                        Daily='Yes')
     # understand the percentage difference between buy price and CMP
     multiple_stocks_df_daily['CMP_Bp_diff_pct']=round((multiple_stocks_df_daily['CMP']-multiple_stocks_df_daily['Buy_Price'])/multiple_stocks_df_daily['Buy_Price']*100,2)
 
     # Filter the stocks based on user input
     multiple_stocks_df_daily_filtered = multiple_stocks_df_daily[
-        (multiple_stocks_df_daily['Buy_Signal'] == Buy_Signal)
+        (multiple_stocks_df_daily['Strategy'] == Strategy_signal)
+        & (multiple_stocks_df_daily['Buy_Signal'] == Buy_Signal)
         & (multiple_stocks_df_daily['CMP_Bp_diff_pct'] <= CMP_Bp_diff_pct)
         & (multiple_stocks_df_daily['Buy_Date'] >= Buy_Date)
         & (multiple_stocks_df_daily['CAGR'] >= CAGR)]
@@ -138,13 +143,19 @@ st.text("Initial investment amount (int)")
 # st.text("Print Results : whether to print the detailed results or not")
 st.text("MACD Difference (int) : Diffenrence between signal and macd line")
 st.text("Stop Loss (int)")
+st.text("trailing_stop_loss_gain_pct (int) : gain required before activating the trailing stop loss")
+st.text("trailing_stop_loss_pct (int) : loss from high price for trailing stop loss")
 
 Ticker_Name=st.text_input("Ticker Name :",'ICICIBANK')
 Backtest_start_Date=st.text_input("Backtest start date :",'2000-01-01')
-investment=st.number_input('Initial investment amount :', min_value=0, max_value=100000000, value=100000, step=1)
+investment=st.number_input('Initial investment amount :', min_value=-0, max_value=10000000, value=100000, step=10000)
 # print_results = st.radio("Print Results : ",["No","Yes"])
-macd_dif=st.number_input("MACD Difference :", min_value=-200, max_value=2100, value=5, step=1)
-stop_loss=st.number_input("Stop Loss :", min_value=-100, max_value=100, value=8, step=1)
+macd_dif=st.number_input("MACD Difference :", min_value=-1000, max_value=1000, value=-5, step=1)
+stop_loss=st.number_input("Stop Loss :", min_value=-100, max_value=100, value=8, step=5)
+Trailing_stop_loss_gain=st.number_input("Trailing Stop Loss Gain :",
+                                        min_value=-100, max_value=100, value=30, step=5)
+Trailing_stop_loss_pct=st.number_input("Trailing Stop Loss :",
+                                        min_value=-100, max_value=100, value=10, step=2)
 
 if st.button("Refine", key='my_button_2'):
     # Refined stock on daily basis results
@@ -154,6 +165,8 @@ if st.button("Refine", key='my_button_2'):
                                       print_results="No",
                                       macd_diff=macd_dif,
                                       stop_loss=stop_loss,
+                                      trailing_stop_loss_gain_pct=Trailing_stop_loss_gain,
+                                      trailing_stop_loss_pct=Trailing_stop_loss_pct,
                                       Daily='Yes')
     # Refined stock on weekly basis results
     ref_stock_weekly = automate_strategies(ticker=Ticker_Name,
@@ -162,7 +175,9 @@ if st.button("Refine", key='my_button_2'):
                                       print_results="No",
                                       macd_diff=macd_dif,
                                       stop_loss=stop_loss,
-                                       Daily='No')
+                                      trailing_stop_loss_gain_pct=Trailing_stop_loss_gain,
+                                      trailing_stop_loss_pct=Trailing_stop_loss_pct,
+                                      Daily='No')
 
     st.text("Backtesting results for Daily data :")
     st.dataframe(ref_stock_daily)
@@ -173,7 +188,7 @@ if st.button("Refine", key='my_button_2'):
 # Printing the detailed trades of finalized strategy
 st.subheader("Printing the detailed trades of finalized strategy", divider='rainbow')
 daily_weekly = st.radio("Daily or Weekly Price : ",["Daily","Weekly"])
-final_strategy = st.radio("Daily or Weekly Price : ",["Plain","Reverse","RevMACD"])
+final_strategy = st.radio("Strategy Finalized : ",["Plain","Reverse","RevMACD","RevMACDSelSw"])
 
 if st.button("Get Detailed Trades", key='my_button_3'):
     df = pdr.get_data_yahoo(str(Ticker_Name + ".NS"), start=Backtest_start_Date)
@@ -194,3 +209,9 @@ if st.button("Get Detailed Trades", key='my_button_3'):
     elif final_strategy == 'RevMACD':
         donchian_reverse_macd_st(df, investment=investment, macd_signal_diff=macd_dif,
                               stop_loss_pct=stop_loss, print_results='Yes')
+    elif final_strategy == 'RevMACDSelSw':
+        donchian_reverse_macd_selectedSwing_st(df, investment=investment, macd_signal_diff=macd_dif,
+                              stop_loss_pct=stop_loss,
+                              trailing_stop_loss_gain_pct=Trailing_stop_loss_gain,
+                              trailing_stop_loss_pct=Trailing_stop_loss_pct,
+                              print_results='Yes')
